@@ -2,7 +2,7 @@ from deap import creator, base, tools, algorithms
 import multiprocessing
 import random
 import pandas as pd
-from sklearn.cross_validation import cross_val_score
+from sklearn.cross_validation import cross_val_score, KFold
 import numpy as np
 from sklearn.metrics import f1_score, make_scorer, accuracy_score
 from sklearn.ensemble import RandomForestClassifier
@@ -11,6 +11,7 @@ from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier, AdaBoostClassifier, GradientBoostingClassifier
+from sklearn.gaussian_process import GaussianProcessClassifier
 
 
 
@@ -37,24 +38,60 @@ class AutoSelection():
 
         self.toolbox = toolbox
 
+
  
+#    def eval_performance(self, individual):
+#        col_bool = [True if i==1 else False for i in individual]
+#        col_bool_all = [True for i in individual]
+#        df1 = self.feature.loc[:, col_bool]
+#        df2 = self.feature.loc[:, col_bool_all]
+#        
+#        x1 = df1.values
+#        x2 = df2.values
+#        y = self.target.values
+#
+#        kf = KFold(n=len(x1))
+#        scores = []
+#        for train_index, test_index in kf:
+#            x1_train, x1_test = x1[train_index], x1[test_index]
+#            x2_train, x2_test = x2[train_index], x2[test_index]
+#            y_train, y_test = y[train_index], y[test_index]
+#
+#            #clf = RandomForestClassifier(n_estimators=10)
+#            #clf = XGBClassifier()
+#            clf = LogisticRegression()
+#            clf.fit(x2_train,y_train)
+#            pred = clf.predict(x2_test)
+#            base = f1_score(y_test, pred)
+#
+#            #clf = RandomForestClassifier(n_estimators=10)
+#            #clf = XGBClassifier()
+#            clf = LogisticRegression()
+#            clf.fit(x1_train,y_train)
+#            pred = clf.predict(x1_test)
+#            candidate = f1_score(y_test, pred)
+#            scores.append(candidate-base)
+#        score = np.mean(scores)
+#        print(score)
+#        return score,
+
     def eval_performance(self, individual):
         col_bool = [True if i==1 else False for i in individual]
-        df1 = self.feature.loc[:, col_bool]
-        
-        x = df1.values
-        y = self.target.values
-        
-        scorer = make_scorer(accuracy_score)
-        clf1 = GradientBoostingClassifier()
-        clf2 = LogisticRegression()
-        clf3 = XGBClassifier()
-        clf4 = RandomForestClassifier(n_estimators=10)
-        eclf = VotingClassifier(estimators=[('gb', clf1), ('lr', clf2), ('xgb', clf3),("rf",clf4)], voting='hard')
+        print(col_bool)
+        if not np.any(col_bool):
+            return 0, 
+        df = self.feature.loc[:, col_bool]
 
-        score = np.mean(cross_val_score(clf4, x, y, scoring=scorer, cv=3))
+        x = df.values
+        y = self.target.values
+        #clf = GaussianProcessClassifier()
+        #clf = LogisticRegression()
+        scorer = make_scorer(accuracy_score)
+        clf = XGBClassifier()
+        score = np.mean(cross_val_score(clf, x, y, n_jobs=-1, scoring=scorer, cv=3))
         print(score)
         return score,
+
 
     def run(self, pop_num, cxpb, mutpb, gen_num):
         self.toolbox.register("evaluate", self.eval_performance)
@@ -68,7 +105,8 @@ class AutoSelection():
         best_ind = fits[-1]
         print(best_ind)
         col_bool = [True if i==1 else False for i in best_ind[1]]
-        return pd.concat([self.feature.loc[:, col_bool],self.target],axis=1), col_bool
+        select_col = self.feature.loc[:, col_bool]
+        return pd.concat([select_col,self.target],axis=1), select_col.columns
 
 
 if __name__ == "__main__":

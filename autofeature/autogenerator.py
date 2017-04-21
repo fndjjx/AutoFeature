@@ -22,6 +22,7 @@ from sklearn.linear_model import LogisticRegression
 from minepy import MINE
 from pset_operator import bagging_2, bagging_3,bagging_4, bagging_5
 from loop_bagging import LoopBagging
+from feature_selection import FeatureSelection
 
 def random_str(randomlength=8):
     string = ""
@@ -61,8 +62,8 @@ class AutoGenerator():
             para = "{'ARG%s':'%s'}"%(col_index, self.feature.columns[col_index])
             pset.renameArguments(**eval(para))
 
-        ephemeral = hashlib.md5(random_str().encode('utf-8')).hexdigest()
-        pset.addEphemeralConstant(ephemeral, lambda: np.random.uniform(-10, 10))
+#        ephemeral = hashlib.md5(random_str().encode('utf-8')).hexdigest()
+#        pset.addEphemeralConstant(ephemeral, lambda: np.random.uniform(-10, 10))
 
 
         return pset
@@ -74,14 +75,14 @@ class AutoGenerator():
         toolbox = base.Toolbox()
         toolbox.register("map", futures.map)
 
-        toolbox.register("expr", gp.genFull, pset=self.pset, min_=1, max_=3)
+        toolbox.register("expr", gp.genFull, pset=self.pset, min_=1, max_=2)
         toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
         toolbox.register("evaluate", self.evaluation, pset=self.pset)
         toolbox.register("select", tools.selTournament, tournsize=selectsize)
         toolbox.register("mate", gp.cxOnePoint)
-        toolbox.register("expr_mut", gp.genFull, min_=0, max_=2)
+        toolbox.register("expr_mut", gp.genFull, min_=0, max_=1)
         toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=self.pset)
         pop = toolbox.population(n=popsize)
 
@@ -96,10 +97,10 @@ class AutoGenerator():
 
 
     def evaluation(self, individual, pset): 
+        print(str(individual))
         func = gp.compile(individual,pset)
         
         new=func(**self.feature_dict)
-        print(str(individual))
         if np.std(new)<0.001 or (np.mean(new)!=0 and abs(np.std(new)/np.mean(new)) < 0.001):
             return -10,
         ### method 1
@@ -159,10 +160,19 @@ class AutoGenerator():
      #   score = score / mean_score
 
 
-        
         mine = MINE()
         mine.compute_score(self.target.values, new)
-        score=mine.mic()/len(np.unique(new))
+        score=mine.mic()#/len(np.unique(new))
+        scores = []
+     #   for i in self.feature.columns:
+     #       col_values = self.feature[i].values
+     #       scores.append(abs(np.corrcoef(col_values, new)[0][1]))
+     #       mine = MINE()
+     #       mine.compute_score(col_values, new)
+     #       scores.append(mine.mic()/len(np.unique(col_values)))
+     #   score = score - np.mean(scores)
+     #       scores.append(mutual_info_score(col_values, new)/len(np.unique(new)))
+     #       #scores.append(mutual_info_score(col_values, new))
  
         #score=mutual_info_score(self.target.values, new)/len(np.unique(new))
 
@@ -192,24 +202,44 @@ class AutoGenerator():
         print(score)
         return score,
 
+    def valid_new(self, new, new_list):
+        scores = []
+        for i in new_list:
+            scores.append(abs(np.corrcoef(new,i)[0][1]))
+        for col in self.feature.columns:
+            scores.append(abs(np.corrcoef(new,self.feature[col].values)[0][1]))
+        
+        print("score")
+        print(max(scores))
+        print(max(scores)>0.9 or (np.any(np.isnan(new))) or (np.any(np.isinf(new))))
+        if max(scores)>0.9 or (np.any(np.isnan(new))) or (np.any(np.isinf(new))):
+            return False
+        else:
+            return True
+
     def get_best(self, fits, pset, k):
         new = []
         new_ins = []
         new_str = []
         new_score = []
         count = 0
+        print("begin get best")
         for i in range(1, len(fits)):
             individual = fits[-i][0]
-            print(individual)
+            print(i)
+            print("count {}".format(count))
+            print(str(individual))
             if str(individual) not in new_str:
                 func = gp.compile(individual, pset)
-                new.append(func(**self.feature_dict))
-                new_str.append(str(individual))
-                new_score.append(fits[-i][1])
-                new_ins.append(individual)
-                count += 1
-                if count>=k:
-                    break
+                new_tmp = func(**self.feature_dict)
+                if self.valid_new(new_tmp, new):
+                    new.append(new_tmp)
+                    new_str.append(str(individual))
+                    new_score.append(fits[-i][1])
+                    new_ins.append(individual)
+                    count += 1
+                    if count>=k:
+                        break
               
         print("new_str")
         print(new)
@@ -235,12 +265,12 @@ class AutoGenerator():
         return feature 
 
     def restore_ind(self, ind, df):
+        print(str(ind))
         func = gp.compile(ind, self.pset)
         print(str(func))
         feature_dict = {}
         for col in df.columns:
             feature_dict[col] = df[col].values
-
         new_add = func(**feature_dict)
         return new_add
 
