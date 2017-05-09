@@ -18,7 +18,7 @@ def minusmean(x,y):
 
 def log(x):
     if min(x)<0:
-        x=np.array(x)+min(x)
+        x=np.array(x)+abs(min(x)*1.001)
     return np.log1p(x)
     
 

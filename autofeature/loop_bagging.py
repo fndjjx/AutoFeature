@@ -4,7 +4,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import (RandomTreesEmbedding, RandomForestClassifier,
                               GradientBoostingClassifier)
 from sklearn.cross_validation import cross_val_score
-from sklearn.metrics import f1_score, make_scorer, accuracy_score,mutual_info_score
+from sklearn.metrics import f1_score, make_scorer, accuracy_score,mutual_info_score,roc_auc_score
 import autotune
 from xgboost.sklearn import XGBClassifier
 from sklearn.linear_model import LogisticRegression
@@ -35,14 +35,15 @@ class LoopBagging():
 
                 #clf1 = GradientBoostingClassifier()
                 #clf2 = LogisticRegression()
-                #clf3 = XGBClassifier()
-                clf = RandomForestClassifier()
+                #clf = XGBClassifier()
+                #clf = RandomForestClassifier()
                 #eclf = VotingClassifier(estimators=[('lr', clf1), ('rf', clf2), ('gnb', clf3),("rr",clf4)], voting='hard')
-                scorer = make_scorer(accuracy_score)
-                value = np.mean(cross_val_score(clf, bagging_value2, self.target.values, scoring=scorer,n_jobs=-1, cv=5))
-                #mine = MINE()
-                #mine.compute_score(self.target.values, bagging_value1)
-                #value=mine.mic()/len(np.unique(bagging_value1))
+                #scorer = make_scorer(accuracy_score)
+                #scorer = make_scorer(roc_auc_score)
+                #value = np.mean(cross_val_score(clf, bagging_value2, self.target.values, scoring=scorer,n_jobs=-1, cv=5))
+                mine = MINE()
+                mine.compute_score(self.target.values, bagging_value1)
+                value=mine.mic()#/len(np.unique(bagging_value1))
 
                 record.append([bagging_list[i], value, bagging_value1])
             record.sort(key=lambda x:x[1])

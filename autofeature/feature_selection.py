@@ -1,5 +1,7 @@
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression,RandomizedLogisticRegression
 from sklearn.linear_model import Lasso, RidgeClassifier
+from xgboost.sklearn import XGBClassifier
 from minepy import MINE
 import numpy as np
 import pandas as pd
@@ -7,7 +9,8 @@ import pandas as pd
 class FeatureSelection():
 
     def __init__(self):
-        self.estimators = [CorrelationEstimator(), RandomforestEstimator(), LassoEstimator(), MICEstimator(), RidgeEstimator()]
+        self.estimators = [CorrelationEstimator(), RandomforestEstimator(), LassoEstimator(), MICEstimator(), RidgeEstimator(), XgbEstimator(), RandomlogisticEstimator()]
+        #self.estimators = [CorrelationEstimator(), RandomforestEstimator(), MICEstimator(), RidgeEstimator(), XgbEstimator(), RandomlogisticEstimator()]
         self.scores = {}
 
     def run(self, df, target_label, k):
@@ -111,6 +114,62 @@ class RandomforestEstimator(Estimator):
         print(position)
         return position
 
+class RandomlogisticEstimator(Estimator):
+    def __init__(self):
+        self.name = "rl"
+    def run(self, df, target_label):
+        target = df[target_label]
+        feature = df.drop(target_label,axis=1)
+        clf = RandomizedLogisticRegression()
+        for col in feature.columns:
+            if np.any(np.isnan(feature[col].values)) or np.any(np.isinf(feature[col].values)):
+                print(list(feature[col].values))
+        try:
+            clf.fit(feature.values, target.values)
+        except:
+            for col in feature.columns:
+                print(list(feature[col].values))
+        scores = {}
+        for col_index in range(len(feature.columns)):
+            scores[feature.columns[col_index]] = abs(clf.scores_[col_index])
+        scores = sorted(scores.items(),key=lambda x:x[1],reverse=True)
+        print(scores)
+        position = {}
+        i = 0
+        for col,_ in scores:
+            position[col] = i
+            i+=1
+        print(position)
+        return position
+
+class XgbEstimator(Estimator):
+    def __init__(self):
+        self.name = "xgb"
+    def run(self, df, target_label):
+        target = df[target_label]
+        feature = df.drop(target_label,axis=1)
+        clf = XGBClassifier()
+        for col in feature.columns:
+            if np.any(np.isnan(feature[col].values)) or np.any(np.isinf(feature[col].values)):
+                print(list(feature[col].values))
+        try:
+            clf.fit(feature.values, target.values)
+        except:
+            for col in feature.columns:
+                print(list(feature[col].values))
+        scores = {}
+        for col_index in range(len(feature.columns)):
+            scores[feature.columns[col_index]] = abs(clf.feature_importances_[col_index])
+        scores = sorted(scores.items(),key=lambda x:x[1],reverse=True)
+        print(scores)
+        position = {}
+        i = 0
+        for col,_ in scores:
+            position[col] = i
+            i+=1
+        print(position)
+        return position
+
 class LassoEstimator(Estimator):
     def __init__(self):
         self.name = "la"
@@ -161,5 +220,6 @@ if __name__ == "__main__":
     df = pd.read_csv("/tmp/middle.csv")
     #df.fillna(0,inplace=True)
     fs = FeatureSelection() 
-    new_df, cols = fs.run(df, "flag", 300)
+    new_df, cols = fs.run(df, "Survived", 50)
+    new_df.to_csv("/tmp/final.csv",index=False)
     print(cols)

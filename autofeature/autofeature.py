@@ -43,19 +43,12 @@ class AutoFeature():
         print("begin generate")
         continuous_df = pd.concat([continuous_df, target],axis=1)
         ag = AutoGenerator(continuous_df, self.target_label, c_config)
-        new_add_cols, transform_methods = ag.run(popsize=300, matepb=0.6, mutpb=0.3, gensize=10, selectsize=100, kbest=50)
+        new_add_cols, transform_methods = ag.run(popsize=500, matepb=0.7, mutpb=0.2, gensize=20, selectsize=100, kbest=50)
         for i in range(len(new_add_cols)):
             col_name = "new{}".format(i)
             continuous_df[col_name] = new_add_cols[i]
             self.c_transform_methods[col_name] = transform_methods[i]
 
-        discrete_df = pd.concat([discrete_df, target],axis=1)
-        ag = AutoGenerator(discrete_df, self.target_label, d_config)
-        new_add_cols, transform_methods = ag.run(popsize=300, matepb=0.6, mutpb=0.3, gensize=10, selectsize=100, kbest=50)
-        for i in range(len(new_add_cols)):
-            col_name = "newd{}".format(i)
-            discrete_df[col_name] = new_add_cols[i]
-            self.d_transform_methods[col_name] = transform_methods[i]
 
         #step3
         lb = LoopBagging(continuous_df, self.target_label)
@@ -66,6 +59,14 @@ class AutoFeature():
             col_name = "bagging{}".format(col)
             discrete_df[col_name] = value[2]
             self.bagging_methods[col] = value[0]
+
+        discrete_df = pd.concat([discrete_df, target],axis=1)
+        ag = AutoGenerator(discrete_df, self.target_label, d_config)
+        new_add_cols, transform_methods = ag.run(popsize=500, matepb=0.7, mutpb=0.2, gensize=20, selectsize=100, kbest=50)
+        for i in range(len(new_add_cols)):
+            col_name = "newd{}".format(i)
+            discrete_df[col_name] = new_add_cols[i]
+            self.d_transform_methods[col_name] = transform_methods[i]
 
          
         #step4
@@ -119,6 +120,8 @@ class AutoFeature():
         test_df = pd.concat([test_discrete_df, test_continuous_df],axis=1)
 
         test_df = get_dummy(test_df, self.dummy_candidate_col)
+        test_df = remove_same(test_df)
+        test_df.to_csv("middle2.csv",index=False)
 
         #step3
         new_test_df = pd.DataFrame()
@@ -138,31 +141,11 @@ if __name__=="__main__":
     clean_data.to_csv("/tmp/train_after_etl.csv", sep=',', index=False)
     train_df = pd.read_csv("/tmp/train_after_etl.csv")
 
-    remove_list = []
-    for col in train_df.columns:
-        l = train_df[col].isnull()
-        if l.any():
-            remove_list.append(col)
-
-    for col in remove_list:
-        train_df = train_df.drop(col,axis=1)
-
     raw_data = pd.read_csv("/tmp/test.csv", error_bad_lines=False)
     clean_data = autoclean(raw_data)
     clean_data.to_csv("/tmp/test_after_etl.csv", sep=',', index=False)
     test_df = pd.read_csv("/tmp/test_after_etl.csv")
 
-    remove_list = []
-    for col in test_df.columns:
-        l = test_df[col].isnull()
-        if l.any():
-            remove_list.append(col)
-
-    for col in remove_list:
-        test_df = test_df.drop(col,axis=1)
-
-    train_df.fillna(0,inplace=True)
-    test_df.fillna(0,inplace=True)
 
     af = AutoFeature(train_df, "Survived", 20, test_df)
     train_df = af.fit(config1,config2)

@@ -1,13 +1,15 @@
 from deap import base, creator, gp
 from deap import creator, base, tools, algorithms
 from scoop import futures
+from xgboost.sklearn import XGBClassifier
 import hashlib
 import random
 import numpy as np
 from sklearn.cross_validation import train_test_split
 from sklearn.cross_validation import cross_val_score
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
-from sklearn.metrics import f1_score, make_scorer, accuracy_score, mutual_info_score, auc
+from sklearn.metrics import f1_score, make_scorer, accuracy_score, mutual_info_score, roc_auc_score
+from sklearn.cross_validation import KFold
 from sklearn import linear_model
 import pickle
 from random import Random
@@ -19,10 +21,14 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression,RandomizedLogisticRegression
 from minepy import MINE
 from pset_operator import bagging_2, bagging_3,bagging_4, bagging_5
 from loop_bagging import LoopBagging
 from feature_selection import FeatureSelection
+from tasks import get_result
+from celery import group
+from celery.result import allow_join_result
 
 def random_str(randomlength=8):
     string = ""
@@ -32,6 +38,7 @@ def random_str(randomlength=8):
     for i in range(randomlength):
         string+=chars[random.randint(0, length)]
     return string
+
 
 
 class AutoGenerator():
@@ -85,11 +92,12 @@ class AutoGenerator():
         toolbox.register("expr_mut", gp.genFull, min_=0, max_=1)
         toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=self.pset)
         pop = toolbox.population(n=popsize)
+        hof = tools.HallOfFame(300)
 
-        pop, log = algorithms.eaSimple(pop, toolbox, matepb, mutpb, gensize, verbose=True)
+        pop, log = algorithms.eaSimple(pop, toolbox, matepb, mutpb, gensize, halloffame=hof, verbose=True)
 
         fits = []
-        for i in pop:
+        for i in hof:
             fits.append([i, i.fitness.values[0], str(i)])
         fits.sort(key=lambda x:x[1])
 
@@ -104,8 +112,9 @@ class AutoGenerator():
         if np.std(new)<0.001 or (np.mean(new)!=0 and abs(np.std(new)/np.mean(new)) < 0.001):
             return -10,
         ### method 1
-     #   x = self.feature.values
-     #   x = np.column_stack([self.feature.values,new])
+        x1 = self.feature.values
+        x2 = np.column_stack([self.feature.values,new])
+        y = self.target.values
         #x = [[i] for i in new]
      #   random_num = np.random.randint(0, len(model_list))
      #   random_num = len(model_list)-1
@@ -129,11 +138,55 @@ class AutoGenerator():
         #base_score2 = np.mean(cross_val_score(clf, x, self.target.values, scoring=scorer, n_jobs=-1, cv=2))
 
       #  np.random.shuffle(new)
-        #x = [[i] for i in new]
+      #  x = [[i] for i in new]
+      #  x = np.array(x)
       #  x = np.column_stack([self.feature.values,new])
       #  clf=model_list[random_num]()
-      #  scorer = make_scorer(accuracy_score)
-      #  score2=np.mean(cross_val_score(clf, x, self.target.values, scoring=scorer, n_jobs=-1, cv=3))
+        #clf = LogisticRegression()
+     #   kf = KFold(len(x1), n_folds=3)
+     ##   
+     ## #  scores=[]
+     #   x1_train_list = []
+     #   x2_train_list = []
+     #   x1_test_list = []
+     #   x2_test_list = []
+     #   y_train_list = []
+     #   y_test_list = []
+     #   for train_index, test_index in kf:
+     #       x1_train_list.append(list(x1[train_index]))
+     #       x1_test_list.append(list(x1[test_index]))
+     #       x2_train_list.append(list(x2[train_index]))
+     #       x2_test_list.append(list(x2[test_index]))
+     #       y_train_list.append(list(y[train_index]))
+     #       y_test_list.append(list(y[test_index]))
+     #   for train_index, test_index in kf:
+     #       x1_train, x1_test = x1[train_index], x1[test_index]
+     #       x2_train, x2_test = x2[train_index], x2[test_index]
+     #       y_train, y_test = y[train_index], y[test_index]
+
+
+      #      clf1 = RandomForestClassifier()
+      #      clf1.fit(x1_train,y_train)
+      #      r1 = clf1.predict(x1_test)
+      #      score1 = accuracy_score(y_test,r1)
+
+      #      clf2 = RandomForestClassifier()
+      #      clf2.fit(x2_train,y_train)
+      #      r2 = clf2.predict(x2_test)
+      #      score2 = accuracy_score(y_test,r2)
+
+      #      scores.append(score2-score1)
+      #  x1_list = [x1[:len(x1)/3],x1[len(x1)/3:2*len(x1)/3],x1[2*len(x1)/3:]]
+      #  x2_list = [x2[:len(x1)/3],x2[len(x2)/3:2*len(x2)/3],x2[2*len(x2)/3:]]
+      #  y_list = [y[:len(y)/3],y[len(y)/3:2*len(y)/3],y[2*len(y)/3:]]
+      #  result_group = group(get_result.s(x1_list[index], x2_list[index], y_list[index]) for index in range(len(x1_list)))()
+      #  #result_group = group(add.signature(i,i) for i in range(10))()
+      #  #result_group = group(add.s(i, i) for i in range(100))()
+      #  result = result_group.get()
+      #  print(result)
+      #  score = np.mean(result)
+
+
         #clf=RandomForestClassifier()
         #clf.fit(self.x_train,self.y_train)
         #pred = clf.predict(self.x_test)
@@ -164,22 +217,22 @@ class AutoGenerator():
         mine.compute_score(self.target.values, new)
         score=mine.mic()#/len(np.unique(new))
         scores = []
-     #   for i in self.feature.columns:
-     #       col_values = self.feature[i].values
+        for i in self.feature.columns:
+            col_values = self.feature[i].values
      #       scores.append(abs(np.corrcoef(col_values, new)[0][1]))
-     #       mine = MINE()
-     #       mine.compute_score(col_values, new)
-     #       scores.append(mine.mic()/len(np.unique(col_values)))
-     #   score = score - np.mean(scores)
+            mine = MINE()
+            mine.compute_score(col_values, new)
+            scores.append(mine.mic())
+        score = score - np.mean(scores)
      #       scores.append(mutual_info_score(col_values, new)/len(np.unique(new)))
      #       #scores.append(mutual_info_score(col_values, new))
  
         #score=mutual_info_score(self.target.values, new)/len(np.unique(new))
 
 #        np.random.shuffle(new)
-#        mine = MINE()
-#        mine.compute_score(self.target.values, new)
-#        score2=mine.mic()/len(np.unique(new))
+        #mine = MINE()
+        #mine.compute_score(self.target.values, new)
+        #score=mine.mic()#/len(np.unique(new))
 #        score = score-score2 
      #   scores = []
         #for i in self.feature.columns:
@@ -193,12 +246,39 @@ class AutoGenerator():
 
         #### method 3
         #new = np.column_stack([self.feature.values,new])
-        #es = []
-        #for i in range(5):
-        #    clf = ExtraTreesClassifier()
-        #    clf.fit(new, self.target.values)
-        #    es.append(clf.feature_importances_[-1])
-        #score = np.mean(es)
+        #clf = RandomizedLogisticRegression()
+        #clf.fit(new, self.target.values)
+        #rank = []
+        ##for index in range(len(clf.feature_importances_)):
+        #for index in range(len(clf.scores_)):
+        #    #rank.append([clf.feature_importances_[index], index])
+        #    rank.append([clf.scores_[index], index])
+        #rank.sort(key=lambda x:x[0])
+        #for index in range(len(rank)):
+        #    #if rank[index][1] == len(clf.feature_importances_)-1 :
+        #    if rank[index][1] == len(clf.scores_)-1 :
+        #        score1 = index
+
+        #clf = XGBClassifier()
+        #clf.fit(new, self.target.values)
+        #rank = []
+        #for index in range(len(clf.feature_importances_)):
+        #    rank.append([clf.feature_importances_[index], index])
+        #rank.sort(key=lambda x:x[0])
+        #for index in range(len(rank)):
+        #    if rank[index][1] == len(clf.feature_importances_)-1 :
+        #        score2 = index
+
+        #clf = RandomForestClassifier()
+        #clf.fit(new, self.target.values)
+        #rank = []
+        #for index in range(len(clf.feature_importances_)):
+        #    rank.append([clf.feature_importances_[index], index])
+        #rank.sort(key=lambda x:x[0])
+        #for index in range(len(rank)):
+        #    if rank[index][1] == len(clf.feature_importances_)-1 :
+        #        score3 = index
+            
         print(score)
         return score,
 
@@ -285,72 +365,11 @@ if __name__ == "__main__":
     from datacleaner import autoclean
     raw_data = pd.read_csv("/tmp/train.csv", error_bad_lines=False)
     clean_data = autoclean(raw_data)
-    clean_data.to_csv("/tmp/train_after_etl.csv", sep=',', index=False)
+
+    ag = AutoGenerator(clean_data, "Survived", config1)
+    new_add_cols, transform_methods = ag.run(popsize=100, matepb=0.7, mutpb=0.2, gensize=10, selectsize=100, kbest=30)
 
 
 
-    instances11 = []
-    df = pd.read_csv("/tmp/train_after_etl.csv") 
-    #l = ["Name","Cabin","Fare","Ticket", "Survived"]
-    df1 = df.drop("PassengerId",axis=1)
-    df1 = df1.drop("Sex",axis=1)
-    df1 = df1.drop("Pclass",axis=1)
-    df1 = df1.drop("Embarked",axis=1)
-    df1 = df1.drop("Name",axis=1)
-    af = AutoFeature(df1, "Survived", config1)
-    new, instance = af.run(popsize=100, matepb=0.6, mutpb=0.3, gensize=20, selectsize=10, kbest=20)
-    print(new)
-    for i in range(len(new)):
-        df["new{}".format(i)] = new[i]
-    df.to_csv("/tmp/train_after_etl.csv",index=False)
-    filename = "new11{}".format(i)
-    output = open(filename, 'wb')
-    pickle.dump(instance[0], output)
-    output.close()
-    instances11.append(filename)
 
-
-    instances12=[]
-    df = pd.read_csv("/tmp/train_after_etl.csv")
-    #l = ["Name","Cabin","Fare","Ticket", "Survived"]
-    df1 = df.drop("PassengerId",axis=1)
-    df1 = df1.drop("Sex",axis=1)
-    df1 = df1.drop("Pclass",axis=1)
-    df1 = df1.drop("Embarked",axis=1)
-    df1 = df1.drop("Name",axis=1)
-    df1 = df1.drop("Cabin",axis=1)
-    lb = LoopBagging(df1, "Survived")
-    new = lb.run()
-    print(new)
-    for key,value in new.items():
-        df["bagging{}".format(key)] = value[2]
-        instances12.append([key, value[0], value[1]])
-    print("nnn")
-    print(instances12)
-    df.to_csv("/tmp/train_after_etl.csv",index=False)
-
-
-    raw_data = pd.read_csv("/tmp/test.csv", error_bad_lines=False)
-    clean_data = autoclean(raw_data)
-    clean_data.to_csv("/tmp/test_after_etl.csv", sep=',', index=False)
-
-
-    for i in instances11:
-        print("restore")
-        print(i)
-        df = pd.read_csv("/tmp/test_after_etl.csv") 
-        af = AutoFeature(df, None, config1)
-        df = af.restore_ind(i, "/tmp/test_after_etl.csv", "new0")
-        df.to_csv("/tmp/test_after_etl.csv",index=False)
-
-    for i in range(len(instances12)):
-        print("restore")
-        print(i)
-        df = pd.read_csv("/tmp/test_after_etl.csv")
-    #    af = AutoFeature(df, None, config2)
-    #    df = af.restore_ind(i, "/tmp/test_after_etl.csv","new0")
-        col = instances12[i][0]
-        f=instances12[i][1]
-        df["new1{}".format(col)]=f(df[col].values)
-        df.to_csv("/tmp/test_after_etl.csv",index=False)
 
