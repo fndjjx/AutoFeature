@@ -122,10 +122,13 @@ class AutoGenerator():
         #scores = []
         #for i in range(len(metric_list)):
         #    scorer = make_scorer(metric_list[i])
-        #scorer = make_scorer(f1_score)
+        scorer = make_scorer(accuracy_score)
         #    scores.append(np.mean(cross_val_score(clf, x, self.target.values, scoring=scorer, n_jobs=-1, cv=3)))
      #   scorer = make_scorer(accuracy_score)
-     #   score=np.mean(cross_val_score(clf, x, self.target.values, scoring=scorer, n_jobs=-1, cv=3))
+        clf = XGBClassifier()
+        score1=np.mean(cross_val_score(clf, x1, self.target.values, scoring=scorer, n_jobs=-1, cv=10))
+        score2=np.mean(cross_val_score(clf, x2, self.target.values, scoring=scorer, n_jobs=-1, cv=10))
+        score = score2-score1
         #score = sum(abs(self.target.values-new))
 
         #x = np.column_stack([new])
@@ -213,17 +216,17 @@ class AutoGenerator():
      #   score = score / mean_score
 
 
-        mine = MINE()
-        mine.compute_score(self.target.values, new)
-        score=mine.mic()#/len(np.unique(new))
-        scores = []
-        for i in self.feature.columns:
-            col_values = self.feature[i].values
-     #       scores.append(abs(np.corrcoef(col_values, new)[0][1]))
-            mine = MINE()
-            mine.compute_score(col_values, new)
-            scores.append(mine.mic())
-        score = score - np.mean(scores)
+       # mine = MINE()
+       # mine.compute_score(self.target.values, new)
+       # score=mine.mic()#/len(np.unique(new))
+     #   scores = []
+     #   for i in self.feature.columns:
+     #       col_values = self.feature[i].values
+     ##       scores.append(abs(np.corrcoef(col_values, new)[0][1]))
+     #       mine = MINE()
+     #       mine.compute_score(col_values, new)
+     #       scores.append(mine.mic())
+     #   score = score - np.mean(scores)
      #       scores.append(mutual_info_score(col_values, new)/len(np.unique(new)))
      #       #scores.append(mutual_info_score(col_values, new))
  
