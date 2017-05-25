@@ -11,10 +11,14 @@ from balance import blance_positive_negative
 from data_manager import DataManager
 from feature_selection import FeatureSelection
 from remove_same import remove_same
+from sklearn.metrics import f1_score, make_scorer, accuracy_score, mutual_info_score, roc_auc_score, calinski_harabaz_score, adjusted_rand_score
+from xgboost.sklearn import XGBClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 
 class AutoFeature():
 
-    def __init__(self, train_df, target_label, final_feature_number, test_df=None):
+    def __init__(self, train_df, target_label, final_feature_number, clf_obj, metric, test_df=None):
         self.c_transform_methods = {}
         self.d_transform_methods = {}
         self.bagging_methods = {}
@@ -25,6 +29,8 @@ class AutoFeature():
         self.train_df, self.test_df, self.dummy_candidate_col = dm.run()
         self.train_df.to_csv("/tmp/train_after_etl.csv",index=False)
         self.target_label = target_label
+        self.clf_obj = clf_obj
+        self.metric = metric
 
 
     def fit(self, c_config, d_config):
@@ -42,8 +48,8 @@ class AutoFeature():
         #step2
         print("begin generate")
         continuous_df = pd.concat([continuous_df, target],axis=1)
-        ag = AutoGenerator(continuous_df, self.target_label, c_config)
-        new_add_cols, transform_methods = ag.run(popsize=500, matepb=0.7, mutpb=0.2, gensize=20, selectsize=100, kbest=50)
+        ag = AutoGenerator(continuous_df, self.target_label, c_config, feature, self.clf_obj, self.metric)
+        new_add_cols, transform_methods = ag.run(popsize=300, matepb=0.7, mutpb=0.2, gensize=20, selectsize=100, kbest=50)
         for i in range(len(new_add_cols)):
             col_name = "new{}".format(i)
             continuous_df[col_name] = new_add_cols[i]
@@ -61,8 +67,8 @@ class AutoFeature():
             self.bagging_methods[col] = value[0]
 
         discrete_df = pd.concat([discrete_df, target],axis=1)
-        ag = AutoGenerator(discrete_df, self.target_label, d_config)
-        new_add_cols, transform_methods = ag.run(popsize=500, matepb=0.7, mutpb=0.2, gensize=20, selectsize=100, kbest=50)
+        ag = AutoGenerator(discrete_df, self.target_label, d_config, feature, self.clf_obj, self.metric)
+        new_add_cols, transform_methods = ag.run(popsize=300, matepb=0.7, mutpb=0.2, gensize=20, selectsize=100, kbest=50)
         for i in range(len(new_add_cols)):
             col_name = "newd{}".format(i)
             discrete_df[col_name] = new_add_cols[i]
@@ -99,7 +105,7 @@ class AutoFeature():
         test_continuous_df = self.test_df[self.continuous_df_col]
         test_discrete_df = self.test_df[self.discrete_df_col]
 
-        ag = AutoGenerator(test_continuous_df, None, c_config)
+        ag = AutoGenerator(test_continuous_df, None, c_config, None, self.clf_obj, self.metric)
         new_add = {}
         for col, transform_method in self.c_transform_methods.items():
             new_add[col] = ag.restore_ind(transform_method, test_continuous_df)
@@ -110,7 +116,7 @@ class AutoFeature():
         for col, bagging_method in self.bagging_methods.items():
             test_discrete_df["bagging{}".format(col)] = bagging_method(test_continuous_df[col].values)
 
-        ag = AutoGenerator(test_discrete_df, None, d_config)
+        ag = AutoGenerator(test_discrete_df, None, d_config, None, self.clf_obj, self.metric)
         new_add = {}
         for col, transform_method in self.d_transform_methods.items():
             new_add[col] = ag.restore_ind(transform_method, test_discrete_df)
@@ -147,7 +153,7 @@ if __name__=="__main__":
     test_df = pd.read_csv("/tmp/test_after_etl.csv")
 
 
-    af = AutoFeature(train_df, "Survived", 20, test_df)
+    af = AutoFeature(train_df, "Survived", 20, LogisticRegression, accuracy_score, test_df)
     train_df = af.fit(config1,config2)
     train_df.to_csv("/tmp/train_after_etl2.csv", sep=',', index=False)
 

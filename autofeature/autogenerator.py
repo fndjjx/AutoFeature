@@ -8,7 +8,8 @@ import numpy as np
 from sklearn.cross_validation import train_test_split
 from sklearn.cross_validation import cross_val_score
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
-from sklearn.metrics import f1_score, make_scorer, accuracy_score, mutual_info_score, roc_auc_score
+from sklearn.metrics import f1_score, make_scorer, accuracy_score, mutual_info_score, roc_auc_score, calinski_harabaz_score, adjusted_rand_score
+from sklearn.cluster import KMeans
 from sklearn.cross_validation import KFold
 from sklearn import linear_model
 import pickle
@@ -29,6 +30,8 @@ from feature_selection import FeatureSelection
 from tasks import get_result
 from celery import group
 from celery.result import allow_join_result
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 
 def random_str(randomlength=8):
     string = ""
@@ -43,7 +46,7 @@ def random_str(randomlength=8):
 
 class AutoGenerator():
 
-    def __init__(self, df, target_label, operator_dict):
+    def __init__(self, df, target_label, operator_dict, feature_all, clf_obj, metric):
            
         if target_label:
             self.target = df[target_label]
@@ -56,6 +59,9 @@ class AutoGenerator():
             self.feature_dict[col] = self.feature[col].values
 
    
+        self.clf_obj = clf_obj
+        self.metric = metric
+        self.feature_all = feature_all
         self.pset = self.init_pset(operator_dict)
         print("generator init finish")
 
@@ -112,8 +118,8 @@ class AutoGenerator():
         if np.std(new)<0.001 or (np.mean(new)!=0 and abs(np.std(new)/np.mean(new)) < 0.001):
             return -10,
         ### method 1
-        x1 = self.feature.values
-        x2 = np.column_stack([self.feature.values,new])
+        x1 = self.feature_all.values
+        x2 = np.column_stack([self.feature_all.values,new])
         y = self.target.values
         #x = [[i] for i in new]
      #   random_num = np.random.randint(0, len(model_list))
@@ -122,13 +128,32 @@ class AutoGenerator():
         #scores = []
         #for i in range(len(metric_list)):
         #    scorer = make_scorer(metric_list[i])
-        scorer = make_scorer(accuracy_score)
+        #scorer = make_scorer(accuracy_score)
         #    scores.append(np.mean(cross_val_score(clf, x, self.target.values, scoring=scorer, n_jobs=-1, cv=3)))
-     #   scorer = make_scorer(accuracy_score)
-        clf = XGBClassifier()
+        scorer = make_scorer(self.metric)
+        clf = self.clf_obj()
         score1=np.mean(cross_val_score(clf, x1, self.target.values, scoring=scorer, n_jobs=-1, cv=10))
         score2=np.mean(cross_val_score(clf, x2, self.target.values, scoring=scorer, n_jobs=-1, cv=10))
         score = score2-score1
+
+
+#        try:
+#            #m = TSNE(n_components=2)
+#            m = PCA(n_components=2)
+#
+#            x1 = m.fit_transform(x1)
+#            x2 = m.fit_transform(x2)
+#
+#            km = KMeans(n_clusters=2)
+#            y_pred = km.fit_predict(x1)
+#            #score1 = calinski_harabaz_score(x1, y_pred) 
+#            score1 = adjusted_rand_score(y,y_pred)
+#            y_pred = km.fit_predict(x2)
+#            #score2 = calinski_harabaz_score(x2, y_pred) 
+#            score2 = adjusted_rand_score(y, y_pred) 
+#            score = score2-score1
+#        except:
+#            score = 0
         #score = sum(abs(self.target.values-new))
 
         #x = np.column_stack([new])
