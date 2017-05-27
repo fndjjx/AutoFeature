@@ -81,9 +81,9 @@ class AutoGenerator():
 
         return pset
 
-    def run(self, popsize=100, matepb=0.6, mutpb=0.3, gensize=20, selectsize=10, kbest=1):
+    def run(self, popsize=100, matepb=0.6, mutpb=0.3, gensize=20, selectsize=10, kbest=1, direction=1):
         print("begin run generate")
-        creator.create("FitnessMin", base.Fitness, weights=(1.0,))
+        creator.create("FitnessMin", base.Fitness, weights=(direction,))
         creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin,pset=self.pset)
         toolbox = base.Toolbox()
         toolbox.register("map", futures.map)
@@ -105,7 +105,10 @@ class AutoGenerator():
         fits = []
         for i in hof:
             fits.append([i, i.fitness.values[0], str(i)])
-        fits.sort(key=lambda x:x[1])
+        if direction == 1:
+            fits.sort(key=lambda x:x[1])
+        else:
+            fits.sort(key=lambda x:x[1], reverse=True)
 
         return self.get_best(fits, self.pset, k=kbest)
 
@@ -132,8 +135,10 @@ class AutoGenerator():
         #    scores.append(np.mean(cross_val_score(clf, x, self.target.values, scoring=scorer, n_jobs=-1, cv=3)))
         scorer = make_scorer(self.metric)
         clf = self.clf_obj()
-        score1=np.mean(cross_val_score(clf, x1, self.target.values, scoring=scorer, n_jobs=-1, cv=10))
-        score2=np.mean(cross_val_score(clf, x2, self.target.values, scoring=scorer, n_jobs=-1, cv=10))
+        score1s = cross_val_score(clf, x1, self.target.values, scoring=scorer, n_jobs=-1, cv=10)
+        score2s = cross_val_score(clf, x2, self.target.values, scoring=scorer, n_jobs=-1, cv=10)
+        score1 = np.mean(score1s) - np.std(score1s)
+        score2 = np.mean(score2s) - np.std(score2s)
         score = score2-score1
 
 

@@ -5,10 +5,11 @@ from remove_same import remove_same
 
 
 class DataManager():
-    def __init__(self, train_df, test_df, target_label):
+    def __init__(self, train_df, test_df, target_label, fit_type):
         self.train_df = train_df
         self.test_df = test_df
         self.target_label = target_label
+        self.fit_type = fit_type
 
     def pre_select(self, df, target_label=None):
         cols = list(df.columns)
@@ -144,8 +145,9 @@ class DataManager():
         print("after aligment")
         print(train_df.shape)
         print(test_df.shape)
-        train_df = self.blance_positive_negative(train_df, self.target_label)
-        train_df, test_df = self.pre_select2(train_df, test_df, self.target_label)
+        if self.fit_type == "classification":
+            train_df = self.blance_positive_negative(train_df, self.target_label)
+            train_df, test_df = self.pre_select2(train_df, test_df, self.target_label)
         print("after pre select")
         print(train_df.shape)
         print(test_df.shape)
