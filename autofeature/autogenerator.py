@@ -97,6 +97,7 @@ class AutoGenerator():
         toolbox.register("mate", gp.cxOnePoint)
         toolbox.register("expr_mut", gp.genFull, min_=0, max_=1)
         toolbox.register("mutate", gp.mutUniform, expr=toolbox.expr_mut, pset=self.pset)
+        self.direction = direction
         pop = toolbox.population(n=popsize)
         hof = tools.HallOfFame(300)
 
@@ -119,7 +120,10 @@ class AutoGenerator():
         
         new=func(**self.feature_dict)
         if np.std(new)<0.001 or (np.mean(new)!=0 and abs(np.std(new)/np.mean(new)) < 0.001):
-            return -10,
+            if self.direction == 1:
+                return -np.inf,
+            else:
+                return np.inf,
         ### method 1
         x1 = self.feature_all.values
         x2 = np.column_stack([self.feature_all.values,new])

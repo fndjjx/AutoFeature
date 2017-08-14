@@ -15,7 +15,7 @@ from sklearn.metrics import f1_score, make_scorer, accuracy_score, mutual_info_s
 from xgboost.sklearn import XGBClassifier, XGBRegressor
 import xgboost.sklearn
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 class AutoFeature():
 
@@ -263,7 +263,14 @@ if __name__=="__main__":
     test_df = pd.read_csv("/tmp/test_after_etl.csv")
 
 
-    af = AutoFeature(train_df, "SalePrice", 20, XGBRegressor, r2_score, "regression", test_df, direction=1)
+    def rmsle(y, y_pred):
+        actual = np.log(y)
+        predicted = np.log(y_pred)
+        return np.sqrt(np.sum(np.square(actual-predicted))/len(actual))
+
+        
+
+    af = AutoFeature(train_df, "y", 20, XGBRegressor, r2_score, "regression", test_df, direction=1)
     train_df = af.fit(config1,config2)
     train_df.to_csv("/tmp/train_after_etl2.csv", sep=',', index=False)
 
