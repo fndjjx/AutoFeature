@@ -98,7 +98,8 @@ class RandomforestEstimator(Estimator):
                 print(list(feature[col].values))
         try:
             clf.fit(feature.values, target.values)
-        except:
+        except Exception as err:
+            print(err)
             for col in feature.columns:
                 print(list(feature[col].values))
         scores = {}

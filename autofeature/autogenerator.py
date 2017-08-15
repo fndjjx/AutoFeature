@@ -1,6 +1,5 @@
 from deap import base, creator, gp
 from deap import creator, base, tools, algorithms
-from scoop import futures
 from xgboost.sklearn import XGBClassifier
 import hashlib
 import random
@@ -24,10 +23,9 @@ from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import LogisticRegression,RandomizedLogisticRegression
 from minepy import MINE
-from pset_operator import bagging_2, bagging_3,bagging_4, bagging_5
-from loop_bagging import LoopBagging
-from feature_selection import FeatureSelection
-from tasks import get_result
+from autofeature.pset_operator import bagging_2, bagging_3,bagging_4, bagging_5
+from autofeature.loop_bagging import LoopBagging
+from autofeature.feature_selection import FeatureSelection
 from celery import group
 from celery.result import allow_join_result
 from sklearn.manifold import TSNE
@@ -86,7 +84,7 @@ class AutoGenerator():
         creator.create("FitnessMin", base.Fitness, weights=(direction,))
         creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin,pset=self.pset)
         toolbox = base.Toolbox()
-        toolbox.register("map", futures.map)
+        #toolbox.register("map", futures.map)
 
         toolbox.register("expr", gp.genFull, pset=self.pset, min_=1, max_=2)
         toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
@@ -128,6 +126,8 @@ class AutoGenerator():
         x1 = self.feature_all.values
         x2 = np.column_stack([self.feature_all.values,new])
         y = self.target.values
+        print(x1.shape)
+        print(x2.shape)
         #x = [[i] for i in new]
      #   random_num = np.random.randint(0, len(model_list))
      #   random_num = len(model_list)-1
@@ -139,10 +139,12 @@ class AutoGenerator():
         #    scores.append(np.mean(cross_val_score(clf, x, self.target.values, scoring=scorer, n_jobs=-1, cv=3)))
         scorer = make_scorer(self.metric)
         clf = self.clf_obj()
-        score1s = cross_val_score(clf, x1, self.target.values, scoring=scorer, n_jobs=-1, cv=10)
-        score2s = cross_val_score(clf, x2, self.target.values, scoring=scorer, n_jobs=-1, cv=10)
+        score1s = cross_val_score(clf, x1, self.target.values, scoring=scorer, n_jobs=-1, cv=3)
+        score2s = cross_val_score(clf, x2, self.target.values, scoring=scorer, n_jobs=-1, cv=3)
         score1 = np.mean(score1s) - np.std(score1s)
         score2 = np.mean(score2s) - np.std(score2s)
+        print(score1)
+        print(score2)
         score = score2-score1
 
 

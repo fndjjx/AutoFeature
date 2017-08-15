@@ -5,12 +5,11 @@ from sklearn.ensemble import (RandomTreesEmbedding, RandomForestClassifier,
                               GradientBoostingClassifier)
 from sklearn.cross_validation import cross_val_score
 from sklearn.metrics import f1_score, make_scorer, accuracy_score,mutual_info_score,roc_auc_score
-import autotune
 from xgboost.sklearn import XGBClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
-from pset_operator import bagging_q_10, bagging_q_20,bagging_q_30,bagging_q_40,bagging_q_50
+from autofeature.pset_operator import bagging_q_10, bagging_q_20,bagging_q_30,bagging_q_40,bagging_q_50
 import numpy as np
 from sklearn.cross_validation import cross_val_score
 

@@ -1,15 +1,16 @@
 import numpy as np
 import pandas as pd
-from feature_selection import FeatureSelection
-from remove_same import remove_same
+from autofeature.feature_selection import FeatureSelection
+from autofeature.remove_same import remove_same
 
 
 class DataManager():
-    def __init__(self, train_df, test_df, target_label, fit_type):
+    def __init__(self, train_df, test_df, target_label, fit_type, sample_reduction_index):
         self.train_df = train_df
         self.test_df = test_df
         self.target_label = target_label
         self.fit_type = fit_type
+        self.sample_reduction_index = sample_reduction_index
 
     def pre_select(self, df, target_label=None):
         cols = list(df.columns)
@@ -152,7 +153,8 @@ class DataManager():
         print(train_df.shape)
         print(test_df.shape)
         dummy_candidate_col = self.dummy_candidate(train_df, test_df)
-        return train_df, test_df, dummy_candidate_col
+        reduction_train_df = train_df.loc[self.sample_reduction_index].reset_index(drop=True)
+        return reduction_train_df, test_df, train_df, dummy_candidate_col
 
 
 

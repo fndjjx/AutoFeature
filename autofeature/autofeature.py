@@ -1,16 +1,16 @@
-from loop_bagging import LoopBagging
-from autogenerator import AutoGenerator
-from autoselection import AutoSelection
-from coltype import ColType
-from get_dummy import get_dummy, restore_dummy
+from autofeature.loop_bagging import LoopBagging
+from autofeature.autogenerator import AutoGenerator
+from autofeature.autoselection import AutoSelection
+from autofeature.coltype import ColType
+from autofeature.get_dummy import get_dummy, restore_dummy
 import pandas as pd
 import numpy as np
-from data_alignment import alignment
-from pre_select import pre_select
-from balance import blance_positive_negative
-from data_manager import DataManager
-from feature_selection import FeatureSelection
-from remove_same import remove_same
+from autofeature.data_alignment import alignment
+from autofeature.pre_select import pre_select
+from autofeature.balance import blance_positive_negative
+from autofeature.data_manager import DataManager
+from autofeature.feature_selection import FeatureSelection
+from autofeature.remove_same import remove_same
 from sklearn.metrics import f1_score, make_scorer, accuracy_score, mutual_info_score, roc_auc_score, calinski_harabaz_score, adjusted_rand_score, r2_score, mean_squared_error
 from xgboost.sklearn import XGBClassifier, XGBRegressor
 import xgboost.sklearn
@@ -19,15 +19,15 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 class AutoFeature():
 
-    def __init__(self, train_df, target_label, final_feature_number, clf_obj, metric, fit_type, test_df=None, direction=1):
+    def __init__(self, train_df, target_label, final_feature_number, clf_obj, metric, fit_type, sample_reduction_index, test_df=None, direction=1):
         self.c_transform_methods = {}
         self.d_transform_methods = {}
         self.bagging_methods = {}
         self.select_col = None
         self.final_feature_number = final_feature_number
 
-        dm = DataManager(train_df, test_df, target_label, fit_type)
-        self.train_df, self.test_df, self.dummy_candidate_col = dm.run()
+        dm = DataManager(train_df, test_df, target_label, fit_type, sample_reduction_index)
+        self.train_df, self.test_df, self.full_train_df, self.dummy_candidate_col = dm.run()
         self.train_df.to_csv("/tmp/train_after_etl.csv",index=False)
         self.target_label = target_label
         self.clf_obj = clf_obj
@@ -59,7 +59,7 @@ class AutoFeature():
         print("begin generate")
         continuous_df = pd.concat([continuous_df, target],axis=1)
         ag = AutoGenerator(continuous_df, self.target_label, c_config, feature, self.clf_obj, self.metric)
-        new_add_cols, transform_methods = ag.run(popsize=300, matepb=0.7, mutpb=0.2, gensize=20, selectsize=100, kbest=50, direction=self.direction)
+        new_add_cols, transform_methods = ag.run(popsize=50, matepb=0.7, mutpb=0.2, gensize=20, selectsize=100, kbest=50, direction=self.direction)
         for i in range(len(new_add_cols)):
             col_name = "new{}".format(i)
             continuous_df[col_name] = new_add_cols[i]
@@ -78,7 +78,7 @@ class AutoFeature():
 
         discrete_df = pd.concat([discrete_df, target],axis=1)
         ag = AutoGenerator(discrete_df, self.target_label, d_config, feature, self.clf_obj, self.metric)
-        new_add_cols, transform_methods = ag.run(popsize=300, matepb=0.7, mutpb=0.2, gensize=20, selectsize=100, kbest=50, direction=self.direction)
+        new_add_cols, transform_methods = ag.run(popsize=50, matepb=0.7, mutpb=0.2, gensize=20, selectsize=100, kbest=50, direction=self.direction)
         for i in range(len(new_add_cols)):
             col_name = "newd{}".format(i)
             discrete_df[col_name] = new_add_cols[i]
@@ -92,8 +92,8 @@ class AutoFeature():
 
         train_df = remove_same(train_df)
         train_df.to_csv("/tmp/middle.csv",index=False)
-        fs = FeatureSelection()
-        train_df, self.select_col = fs.run(train_df, self.target_label, self.final_feature_number)
+#        fs = FeatureSelection()
+#        train_df, self.select_col = fs.run(train_df, self.target_label, self.final_feature_number)
 
 #        train_df_without_target = train_df.drop(target_label,axis=1)
 #        train_df_without_target_with_dummy, self.dummy_col = get_dummy(train_df_without_target)
@@ -176,10 +176,17 @@ class AutoFeature():
 
         return df
 
-    def transform_classification(self, c_config, d_config):
+
+    
+    def __transform_classification(self, c_config, d_config, df):
+        target = pd.DataFrame()
+        if self.target_label in df.columns:
+            target = pd.DataFrame(df[self.target_label])
+            df = df.drop(self.target_label, axis=1)
         #step1
-        test_continuous_df = self.test_df[self.continuous_df_col]
-        test_discrete_df = self.test_df[self.discrete_df_col]
+        
+        test_continuous_df = df[self.continuous_df_col]
+        test_discrete_df = df[self.discrete_df_col]
 
         ag = AutoGenerator(test_continuous_df, None, c_config, None, self.clf_obj, self.metric)
         new_add = {}
@@ -206,12 +213,20 @@ class AutoFeature():
         test_df.to_csv("middle2.csv",index=False)
 
         #step3
-        new_test_df = pd.DataFrame()
-        for col in self.select_col:
-            if col in test_df.columns:
-                new_test_df[col] = test_df[col].values
-        new_test_df = remove_same(new_test_df)
+        #new_test_df = pd.DataFrame()
+        #for col in self.select_col:
+        #    if col in test_df.columns:
+        #        new_test_df[col] = test_df[col].values
+        new_test_df = remove_same(test_df)
+        
+        if len(target)!=0:
+            new_test_df = pd.concat([new_test_df, target],axis=1)
         return new_test_df
+
+    def transform_classification(self, c_config, d_config):
+        test_df = self.__transform_classification(c_config, d_config, self.test_df)
+        full_train_df = self.__transform_classification(c_config, d_config, self.full_train_df)
+        return test_df, full_train_df
 
 
     def transform_regression(self, c_config, d_config):
@@ -275,7 +290,7 @@ if __name__=="__main__":
     train_df.to_csv("/tmp/train_after_etl2.csv", sep=',', index=False)
 
 
-    test_df = af.transform(config1,config2)
+    test_df, full_df = af.transform(config1,config2)
     test_df.to_csv("/tmp/test_after_etl2.csv", sep=',', index=False)
 
 
